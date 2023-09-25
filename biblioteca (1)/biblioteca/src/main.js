@@ -1,0 +1,651 @@
+const electronApp = require('electron').app;
+const electronBrowserWindow = require('electron').BrowserWindow;
+const electronIpcMain = require('electron').ipcMain;
+const Store = require('electron-store');
+const store = new Store();
+const path = require('path');
+const db = require('./connection.js');
+
+// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+if (require('electron-squirrel-startup')) {
+  // eslint-disable-line global-require
+  electronApp.quit();
+}
+
+let window;
+let loginWindow;
+
+const createWindowDashboard = () => {
+  // Create the browser window.
+  window = new electronBrowserWindow({
+    icon: __dirname + '/assets/images/favicon.ico',
+    width: 900,
+    height: 600,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: true,
+      devTools: false,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+
+  // and load the index.html of the app.
+  window.loadFile(path.join(__dirname, 'views/index.html'));
+
+  window.webContents.openDevTools();
+};
+
+const createWindow = () => {
+  // Create the browser window.
+  loginWindow = new electronBrowserWindow({
+    icon: __dirname + '/assets/images/favicon.ico',
+    width: 500,
+    height: 470,
+    resizable: false,
+    maximizable: false,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: true,
+      devTools: false,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+
+  // and load the index.html of the app.
+  loginWindow.loadFile(path.join(__dirname, 'views/login.html'));
+};
+
+// This method will be called when Electron has finished
+// initialization and is ready to create browser windows.
+// Some APIs can only be used after this event occurs.
+
+electronApp.on('ready', createWindow);
+
+// Quit when all windows are closed, except on macOS. There, it's common
+// for applications and their menu bar to stay active until the user quits
+// explicitly with Cmd + Q.
+electronApp.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    electronApp.quit();
+  }
+});
+
+electronApp.on('activate', () => {
+  // On OS X it's common to re-create a window in the app when the
+  // dock icon is clicked and there are no other windows open.
+  if (electronBrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
+
+// In this file you can include the rest of your app's specific main process
+// code. You can also put them in separate files and import them here.
+
+electronIpcMain.on('login', (event, data) => {
+  validateLogin(data);
+});
+
+function validateLogin(data) {
+  const { email, password } = data;
+  const sql = 'SELECT * FROM usuarios WHERE correo=? AND contrasena=?';
+
+  db.query(sql, [email, password], (error, results, fields) => {
+    if (error) {
+      console.log(error);
+    }
+
+    if (results.length > 0) {
+      store.set('user', results[0].usuario);
+      store.set('email', results[0].correo);
+      store.set('permissions', results[0].permiso);
+      store.set('name', results[0].nombre);
+      store.set('image', results[0].imagen);
+
+      createWindowDashboard();
+      window.loadFile(path.join(__dirname, 'views/consultClient.html'));
+      window.maximize();
+      window.show();
+      loginWindow.close();
+    }
+  });
+}
+
+electronIpcMain.on('logout', (event, confirm) => {
+  validateLogout(confirm);
+});
+
+function validateLogout(confirm) {
+  if (confirm == 'confirm-logout') {
+    store.delete('user');
+    store.delete('email');
+    store.delete('permissions');
+    store.delete('name');
+    store.delete('image');
+
+    store.delete('idCarrera');
+    store.delete('nombreCarrera');
+
+    /*store.delete('isbn');
+    store.delete('nombre');
+    store.delete('carrera');
+    store.delete('ubicacion');
+    store.delete('editorial');*/
+
+    store.delete('isbnL');
+    store.delete('nombreL');
+    store.delete('carreraL');
+    store.delete('ubicacionL');
+    store.delete('editorialL');
+
+    store.delete('confirmAdd');
+    store.delete('confirmUpdate');
+    store.delete('confirmDelete');
+
+    createWindow();
+    loginWindow.show();
+    window.close();
+  }
+}
+
+electronIpcMain.on('invitado', (event, permissions) => {
+  store.set('permissions', permissions);
+
+  createWindowDashboard();
+  window.show();
+  loginWindow.close();
+  window.maximize();
+});
+
+electronIpcMain.handle('getUserData', (event) => {
+  const data = { user: store.get('user'), email: store.get('email'), permissions: store.get('permissions'), image: store.get('image'), name: store.get('name') };
+
+  return data;
+});
+
+//Read Clients
+electronIpcMain.on('consultClient', (event, id) => {
+  const sql = 'SELECT * FROM client WHERE id=?';
+
+  db.query(sql, id, (error, results) => {
+    if (error) {
+      console.log(error);
+    }
+    store.set('id', results[0].id);
+    store.set('estudiante', results[0].estudiante);
+    store.set('matricula', results[0].matricula);
+    store.set('estudio', results[0].estudio);
+    store.set('observa', results[0].observa);
+    store.set('tel', results[0].tel);
+    store.set('matriculaenero', results[0].matriculaenero);
+    store.set('matriculafebrero', results[0].matriculafebrero);
+    store.set('matriculamarzo', results[0].matriculamarzo);
+    store.set('matriculaabril', results[0].matriculaabril);
+    store.set('matriculamayo', results[0].matriculamayo);
+    store.set('matriculajunio', results[0].matriculajunio);
+    store.set('matriculajulio', results[0].matriculajulio);
+    store.set('matriculaagosto', results[0].matriculaagosto);
+    store.set('matriculaseptiembre', results[0].matriculaseptiembre);
+    store.set('matriculaoctubre', results[0].matriculaoctubre);
+    store.set('matriculanoviembre', results[0].matriculanoviembre);
+    store.set('matriculadiciembre', results[0].matriculadiciembre);
+    store.set('fecha_sL', results[0].fecha_s);
+    store.set('fecha_eL', results[0].fecha_e);
+  });
+});
+
+electronIpcMain.handle('getClient', (event) => {
+  const data = {
+    id: store.get('id'),
+    estudiante: store.get('estudiante'),
+    matricula: store.get('matricula'),
+    estudio: store.get('estudio'),
+    observa: store.get('observa'),
+    tel: store.get('tel'),
+    matriculaenero: store.get('matriculaenero'),
+    matriculafebrero: store.get('matriculafebrero'),
+    matriculamarzo: store.get('matriculamarzo'),
+    matriculaabril: store.get('matriculaabril'),
+    matriculamayo: store.get('matriculamayo'),
+    matriculajunio: store.get('matriculajunio'),
+    matriculajulio: store.get('matriculajulio'),
+    matriculaagosto: store.get('matriculaagosto'),
+    matriculaseptiembre: store.get('matriculaseptiembre'),
+    matriculaoctubre: store.get('matriculaoctubre'),
+    matriculanoviembre: store.get('matriculanoviembre'),
+    matriculadiciembre: store.get('matriculadiciembre'),
+    fecha_s: store.get('fecha_sL'),
+    fecha_e: store.get('fecha_eL')
+  };
+
+  return data;
+});
+
+electronIpcMain.handle('getClients', (event) => {
+  let id = '',
+  estudiante = '',
+    matricula = '',
+    estudio = '',
+    observa = '',
+    tel = '',
+    matriculaenero = '',
+    matriculafebrero = '',
+    matriculamarzo = '',
+    matriculaabril = '',
+    matriculamayo = '',
+    matriculajunio = '',
+    matriculajulio = '',
+    matriculaagosto = '',
+    matriculaseptiembre = '',
+    matriculaoctubre = '',
+    matriculanoviembre = '',
+    matriculadiciembre = '',
+    fecha_s = '',
+    fecha_e = '';
+
+  db.query('SELECT * FROM client', (error, results, fields) => {
+    if (error) {
+      console.log(error);
+    }
+
+    if (results.length > 0) {
+      for (let i = 0; i < results.length; i++) {
+        id += results[i].id + '_';
+        estudiante += results[i].estudiante + '_';
+        matricula += results[i].matricula + '_';
+        estudio += results[i].estudio + '_';
+        observa += results[i].observa + '_';
+        tel += results[i].tel + '_';
+        matriculaenero += results[i].matriculaenero + '_';
+        matriculafebrero += results[i].matriculafebrero + '_';
+        matriculamarzo += results[i].matriculamarzo + '_';
+        matriculaabril += results[i].matriculaabril + '_';
+        matriculamayo += results[i].matriculamayo + '_';
+        matriculajunio += results[i].matriculajunio + '_';
+        matriculajulio += results[i].matriculajulio + '_';
+        matriculaagosto += results[i].matriculaagosto + '_';
+        matriculaseptiembre += results[i].matriculaseptiembre + '_';
+        matriculaoctubre += results[i].matriculaoctubre + '_';
+        matriculanoviembre += results[i].matriculanoviembre + '_';
+        matriculadiciembre += results[i].matriculadiciembre + '_';
+        fecha_s += results[i].fecha_s + '_';
+        fecha_e += results[i].fecha_e + '_';
+      }
+
+      store.set('id', id);
+      store.set('estudiante', estudiante);
+      store.set('matricula', matricula);
+      store.set('estudio', estudio);
+      store.set('observa', observa);
+      store.set('tel', tel);
+      store.set('matriculaenero', matriculaenero);
+      store.set('matriculafebrero', matriculafebrero);
+      store.set('matriculamarzo', matriculamarzo);
+      store.set('matriculaabril', matriculaabril);
+      store.set('matriculamayo', matriculamayo);
+      store.set('matriculajunio', matriculajunio);
+      store.set('matriculajulio', matriculajulio);
+      store.set('matriculaagosto', matriculaagosto);
+      store.set('matriculaseptiembre', matriculaseptiembre);
+      store.set('matriculaoctubre', matriculaoctubre);
+      store.set('matriculanoviembre', matriculanoviembre);
+      store.set('matriculadiciembre', matriculadiciembre);
+      store.set('fecha_s', fecha_s);
+      store.set('fecha_e', fecha_e);
+    }
+  });
+
+  const data = {
+    id: store.get('id'),
+    estudiante: store.get('estudiante'),
+    matricula: store.get('matricula'),
+    estudio: store.get('estudio'),
+    observa: store.get('observa'),
+    tel: store.get('tel'),
+    matriculaenero: store.get('matriculaenero'),
+    matriculafebrero: store.get('matriculafebrero'),
+    matriculamarzo: store.get('matriculamarzo'),
+    matriculaabril: store.get('matriculaabril'),
+    matriculamayo: store.get('matriculamayo'),
+    matriculajunio: store.get('matriculajunio'),
+    matriculajulio: store.get('matriculajulio'),
+    matriculaagosto: store.get('matriculaagosto'),
+    matriculaseptiembre: store.get('matriculaseptiembre'),
+    matriculaoctubre: store.get('matriculaoctubre'),
+    matriculanoviembre: store.get('matriculanoviembre'),
+    matriculadiciembre: store.get('matriculadiciembre'),
+    fecha_s: store.get('fecha_s'),
+    fecha_e: store.get('fecha_e')
+  };
+
+  return data;
+});
+
+//Create client
+
+electronIpcMain.handle('confirmAddClient', (event) => {
+  return store.get('confirmAdd');
+});
+
+electronIpcMain.on('addClient', (event, data) => {
+  addDBClient(data);
+});
+
+function addDBClient(data) {
+  const { id,
+    estudiante,
+    matricula,
+    estudio,
+    observa,
+    tel,
+    matriculaenero,
+    matriculafebrero,
+    matriculamarzo,
+    matriculaabril,
+    matriculamayo,
+    matriculajunio,
+    matriculajulio,
+    matriculaagosto,
+    matriculaseptiembre,
+    matriculaoctubre,
+    matriculanoviembre,
+    matriculadiciembre,
+    fecha_s, fecha_e } = data;
+  const sql = 'INSERT INTO client (id, estudiante, matricula, estudio, observa, tel, matriculaenero, matriculafebrero, matriculamarzo, matriculaabril, matriculamayo, matriculajunio, matriculajulio, matriculaagosto, matriculaseptiembre, matriculaoctubre, matriculanoviembre, matriculadiciembre, fecha_s, fecha_e) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+
+  db.query(sql, [id, estudiante, matricula, estudio, observa, tel, matriculaenero, matriculafebrero, matriculamarzo,
+    matriculaabril, matriculamayo, matriculajunio, matriculajulio, matriculaagosto,
+    matriculaseptiembre, matriculaoctubre, matriculanoviembre,
+    matriculadiciembre, fecha_s, fecha_e], (error) => {
+      if (error) {
+        console.log(error);
+        store.set('confirmAdd', 0);
+      } else {
+        //  const sql2 = 'INSERT INTO registers (estudiante, fecha_s, fecha_e, fecha_c, type, price) VALUES (?, ?, ?, ?, ?, ?)';
+        //  db.query(sql2, [estudiante, fecha_s, fecha_e, fecha_c, type, price])
+        store.set('confirmAdd', 1);
+      }
+    });
+}
+
+//Update client
+electronIpcMain.handle('confirmUpdateClient', (event) => {
+  return store.get('confirmUpdate');
+});
+
+electronIpcMain.on('updateClient', (event, data) => {
+  updateDBC(data);
+});
+
+function updateDBC(data) {
+  const { id, estudiante, matricula, estudio, observa, tel, matriculaenero, matriculafebrero, matriculamarzo,
+    matriculaabril, matriculamayo, matriculajunio, matriculajulio, matriculaagosto,
+    matriculaseptiembre, matriculaoctubre, matriculanoviembre,
+    matriculadiciembre, fecha_s, fecha_e } = data;
+  const sql = 'UPDATE client SET estudiante=?, matricula=?, estudio=?, observa=?, tel=?, matriculaenero=?, matriculafebrero=?, matriculamarzo=?, matriculaabril=?, matriculamayo=?, matriculajunio=?, matriculajulio=?, matriculaagosto=?, matriculaseptiembre=?, matriculaoctubre=?, matriculanoviembre=?, matriculadiciembre=?, fecha_s=?, fecha_e=? WHERE id=?';
+
+  db.query(sql, [estudiante, matricula, estudio, observa, tel, matriculaenero, matriculafebrero, matriculamarzo,
+    matriculaabril, matriculamayo, matriculajunio, matriculajulio, matriculaagosto,
+    matriculaseptiembre, matriculaoctubre, matriculanoviembre,
+    matriculadiciembre, fecha_s, fecha_e, id], (error) => {
+      if (error) {
+        console.log(error);
+        store.set('confirmUpdate', 0);
+      } else {
+        store.set('confirmUpdate', 1);
+      }
+    });
+}
+
+//Delete client
+electronIpcMain.handle('confirmDeleteClient', (event) => {
+  return store.get('confirmDelete');
+});
+
+electronIpcMain.on('deleteClient', (event, id) => {
+  deleteDBC(id);
+});
+
+function deleteDBC(id) {
+  const sql = 'DELETE FROM client WHERE id = ?';
+
+  db.query(sql, [id], (error) => {
+    if (error) {
+      console.log(error);
+      store.set('confirmDelete', 0);
+    } else {
+      store.set('confirmDelete', 1);
+    }
+  });
+}
+
+// //Renew expired clients
+// electronIpcMain.handle('confirmRenewExpiredClient', (event) => {
+//   return store.get('confirmUpdate');
+// });
+
+// electronIpcMain.on('renewExpiredClient', (event, data) => {
+//   renewEDBC(data);
+// });
+
+// function renewEDBC(data) {
+//   const { estudiante, matricula, matriculaenero, matriculafebrero, matriculamarzo, 
+//   matriculaabril, matriculamayo, matriculajunio, matriculajulio, matriculaagosto, 
+//   matriculaseptiembre, matriculaoctubre, matriculanoviembre, 
+//   matriculadiciembre, fecha_s, fecha_e} = data;
+//   // const sql = 'UPDATE client SET estudiante=?, matricula=?, matriculaenero=?, matriculafebrero=?, matriculamarzo=?, matriculaabril=?, matriculamayo=?, matriculajunio=?, matriculajulio=?, matriculaagosto=?, matriculaseptiembre=?, matriculaoctubre=?, matriculanoviembre=?, matriculadiciembre=?, fecha_s=?, fecha_e=? WHERE estudiante=?';
+//   const sql = 'UPDATE client SET matricula=?, matriculaenero=?, matriculafebrero=?, matriculamarzo=?, matriculaabril=?, matriculamayo=?, matriculajunio=?, matriculajulio=?, matriculaagosto=?, matriculaseptiembre=?, matriculaoctubre=?, matriculanoviembre=?, matriculadiciembre=?, fecha_s=?, fecha_e=? WHERE estudiante=?';
+
+//   db.query(sql, [matricula, matriculaenero, matriculafebrero, matriculamarzo, 
+//   matriculaabril, matriculamayo, matriculajunio, matriculajulio, matriculaagosto, 
+//   matriculaseptiembre, matriculaoctubre, matriculanoviembre, 
+//   matriculadiciembre, fecha_s, fecha_e, estudiante], (error) => {
+//     if (error) {
+//       console.log(error);
+//       store.set('confirmUpdate', 0);
+//     } else {
+//       // const sql2 = 'INSERT INTO registers (estudiante, fecha_s, fecha_e, fecha_c, type, price) VALUES (?, ?, ?, ?, ?, ?)';
+//       // db.query(sql2, [estudiante, fecha_s, fecha_e, fecha_c, type, price])
+//       store.set('confirmUpdate', 1);
+//     }
+//   });
+// }
+
+// //Renew Clients
+// electronIpcMain.handle('confirmRenewClient', (event) => {
+//   return store.get('confirmUpdate');
+// });
+
+// electronIpcMain.on('renewClient', (event, data) => {
+//   renewDBC(data);
+// });
+
+// function renewDBC(data) {
+//   const { estudiante, matricula, matriculaenero, matriculafebrero, matriculamarzo, 
+//   matriculaabril, matriculamayo, matriculajunio, matriculajulio, matriculaagosto, 
+//   matriculaseptiembre, matriculaoctubre, matriculanoviembre, 
+//   matriculadiciembre, fecha_s, fecha_e } = data;
+//   // const sql = 'UPDATE client SET estudiante=?, matricula=?, matriculaenero=?, matriculafebrero=?, matriculamarzo=?, matriculaabril=?, matriculamayo=?, matriculajunio=?, matriculajulio=?, matriculaagosto=?, matriculaseptiembre=?, matriculaoctubre=?, matriculanoviembre=?, matriculadiciembre=?, fecha_s=?, fecha_e=? WHERE estudiante=?';
+//   const sql = 'UPDATE client SET matricula=?, matriculaenero=?, matriculafebrero=?, matriculamarzo=?, matriculaabril=?, matriculamayo=?, matriculajunio=?, matriculajulio=?, matriculaagosto=?, matriculaseptiembre=?, matriculaoctubre=?, matriculanoviembre=?, matriculadiciembre=?, fecha_s=?, fecha_e=? WHERE estudiante=?';
+// console.log(data)
+//   db.query(sql, [matricula, matriculaenero, matriculafebrero, matriculamarzo, 
+//   matriculaabril, matriculamayo, matriculajunio, matriculajulio, matriculaagosto, 
+//   matriculaseptiembre, matriculaoctubre, matriculanoviembre, 
+//   matriculadiciembre, fecha_s, fecha_e, estudiante], (error) => {
+//     if (error) {
+//       console.log(error);
+//       store.set('confirmUpdate', 0);
+//     } else {
+//       // const sql2 = 'INSERT INTO registers (estudiante, fecha_s, fecha_e, fecha_c, type, price) VALUES (?, ?, ?, ?, ?, ?)';
+//       // db.query(sql2, [estudiante, fecha_s, fecha_e, fecha_c, type, price])
+//       store.set('confirmUpdate', 1);
+//     }
+//   });
+// }
+
+//Renew expired clients
+electronIpcMain.handle('confirmRenewExpiredClient', (event) => {
+  return store.get('confirmUpdate');
+});
+
+electronIpcMain.on('renewExpiredClient', (event, data) => {
+  renewEDBC(data);
+});
+
+function renewEDBC(data) {
+  const {
+    id,
+    estudiante,
+    matricula,
+    estudio,
+    observa,
+    tel,
+    matriculaenero,
+    matriculafebrero,
+    matriculamarzo,
+    matriculaabril,
+    matriculamayo,
+    matriculajunio,
+    matriculajulio,
+    matriculaagosto,
+    matriculaseptiembre,
+    matriculaoctubre,
+    matriculanoviembre,
+    matriculadiciembre,
+    fecha_s,
+    fecha_e
+  } = data;
+
+  const sql = 'UPDATE client SET estudiante=?, matricula=?, estudio=?, observa=?, tel=?, matriculaenero=?, matriculafebrero=?, matriculamarzo=?, matriculaabril=?, matriculamayo=?, matriculajunio=?, matriculajulio=?, matriculaagosto=?, matriculaseptiembre=?, matriculaoctubre=?, matriculanoviembre=?, matriculadiciembre=?, fecha_s=?, fecha_e=? WHERE id=?';
+
+  db.query(sql, [
+    estudiante,
+    matricula,
+    estudio,
+    observa,
+    tel,
+    matriculaenero,
+    matriculafebrero,
+    matriculamarzo,
+    matriculaabril,
+    matriculamayo,
+    matriculajunio,
+    matriculajulio,
+    matriculaagosto,
+    matriculaseptiembre,
+    matriculaoctubre,
+    matriculanoviembre,
+    matriculadiciembre,
+    fecha_s,
+    fecha_e,
+    id
+  ], (error) => {
+    if (error) {
+      console.log(error);
+      store.set('confirmUpdate', 0);
+    } else {
+      store.set('confirmUpdate', 1);
+    }
+  });
+}
+
+//Renew Clients
+electronIpcMain.handle('confirmRenewClient', (event) => {
+  return store.get('confirmUpdate');
+});
+
+electronIpcMain.on('renewClient', (event, data) => {
+  renewDBC(data);
+});
+
+function renewDBC(data) {
+  const {
+    id,
+    estudiante,
+    matricula,
+    estudio,
+    observa,
+    tel,
+    matriculaenero,
+    matriculafebrero,
+    matriculamarzo,
+    matriculaabril,
+    matriculamayo,
+    matriculajunio,
+    matriculajulio,
+    matriculaagosto,
+    matriculaseptiembre,
+    matriculaoctubre,
+    matriculanoviembre,
+    matriculadiciembre,
+    fecha_s,
+    fecha_e
+  } = data;
+
+  const sql = 'UPDATE client SET estudiante=?, matricula=?, estudio=?, observa=?, tel=?, matriculaenero=?, matriculafebrero=?, matriculamarzo=?, matriculaabril=?, matriculamayo=?, matriculajunio=?, matriculajulio=?, matriculaagosto=?, matriculaseptiembre=?, matriculaoctubre=?, matriculanoviembre=?, matriculadiciembre=?, fecha_s=?, fecha_e=? WHERE id=?';
+
+  db.query(sql, [
+    estudiante,
+    matricula,
+    estudio,
+    observa,
+    tel,
+    matriculaenero,
+    matriculafebrero,
+    matriculamarzo,
+    matriculaabril,
+    matriculamayo,
+    matriculajunio,
+    matriculajulio,
+    matriculaagosto,
+    matriculaseptiembre,
+    matriculaoctubre,
+    matriculanoviembre,
+    matriculadiciembre,
+    fecha_s,
+    fecha_e,
+    id
+  ], (error) => {
+    if (error) {
+      console.log(error);
+      store.set('confirmUpdate', 0);
+    } else {
+      store.set('confirmUpdate', 1);
+    }
+  });
+}
+
+
+//Read suscriptions
+electronIpcMain.handle('getSuscriptions', async (event) => {
+  try {
+    const results = await new Promise((resolve, reject) => {
+      db.query('SELECT * FROM registers', (error, results, fields) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(results);
+        }
+      });
+    });
+
+    const id = [], fecha_s = [], fecha_e = [], fecha_c = [], type = [], price = [];
+
+    for (let i = 0; i < results.length; i++) {
+      id.push(results[i].id);
+      estudiante.push(results[i].estudiante);
+      fecha_s.push(results[i].fecha_s);
+      fecha_e.push(results[i].fecha_e);
+      fecha_c.push(results[i].fecha_c);
+      type.push(results[i].type);
+      price.push(results[i].price);
+    }
+
+    const data = { id, estudiante, fecha_s, fecha_e, fecha_c, type, price };
+    return data;
+  } catch (error) {
+    console.log(error);
+    return { error: 'An error occurred while fetching the data' };
+  }
+});
